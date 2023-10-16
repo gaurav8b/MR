@@ -1,0 +1,97 @@
+//@version=5
+
+strategy("Reversion",overlay=true,process_orders_on_close=false)
+
+//Capture Bollinger bands
+[middle, upper, lower] = ta.bb(close, 26, .5)
+plot(middle, color=color.blue)
+plot(upper, color=color.green)
+plot(lower, color=color.red)
+
+var count = 0 //counter variable which keeps track of how long the trade has been open
+var lower1 = 0.0 
+var exit2 = 0.0
+var ride1 = 0.0 //captures stoploss for initial buy trade. It's used for the reversal entry condition.
+var ride2 = 0.0
+var reverse1 = 0 //implies that the reversal trade has to take place
+var reverse2 = 0
+
+current_day2 = 0 
+current_day1 = 0 //capture the trade exit date, so that no trade takes place on the same day 
+
+var short_entry = 0.0
+
+//Check for trading hours
+//t1 = time(timeframe.period, "0915-1515")
+//t2 = time(timeframe.period, "0915-1515,:34")
+
+// From Date Inputs
+fromDay = input.int(defval = 1, title = "From Day")
+fromMonth = input.int(defval = 01, title = "From Month", minval = 1, maxval = 12)
+fromYear = input.int(defval = 2020, title = "From Year", minval = 1970)
+
+// To Date Inputs
+toDay = input.int(defval = 31, title = "To Day")
+toMonth = input.int(defval = 12, title = "To Month")
+toYear = input.int(defval = 2024, title = "To Year")
+ 
+// Calculate start/end date and time condition
+startDate = timestamp(fromYear, fromMonth, fromDay, 00, 00)
+finishDate = timestamp(toYear, toMonth, toDay, 00, 00)
+time_cond = time >= startDate and time <= finishDate
+
+// plot(exit2, title='Title', color=color.yellow, linewidth=2, style= plot.style_circles, offset=15, trackprice=true)
+
+// // You may fill the background between any two plots with a fill() function:
+// p1 = plot(open)
+// p2 = plot(close)
+// fill(p1, p2, color=color.new(color.green, 90))
+//var1=month==2
+//plot(var1,color=color.green,style=plot.style_circles)
+
+
+if(month==5) and (dayofmonth==1)
+    lower1 := lower[0]
+    exit2 := middle[0]*0.999
+    
+plot(lower1,color=color.orange,style=plot.style_circles)
+plot(exit2,color=color.black,style=plot.style_circles)
+
+if time_cond //and t1
+   
+
+        
+    //Initial entry conditions
+    if(close<lower1) and (strategy.position_size==0) and (month>=5 and month<=8)
+        strategy.entry(id="buy",direction=strategy.long,limit=close,stop=close[0]*0.98) //close breached lower band
+
+        reverse1:=1
+        ride1:=close[0]*0.90
+        current_day1 := dayofmonth(timenow) //do not trade again on same day
+        
+strategy.close(id="buy",when=low<ride1) //target profit reached for initial trade
+
+//Long reversal condition, id is the identifier for the trade must be used to close the same trade 
+if(low<ride1) and (reverse1==1)
+    strategy.entry(id="long reversal",direction=strategy.short,limit=open[0]*0.95,stop=open[0]*1.05)
+    reverse1 := 0
+    current_day2 := dayofmonth(timenow) //do not trade again on same day
+    short_entry := open[0]*0.99 //short entry price captured
+        
+strategy.close(id="buy",when=close>=exit2) //target profit reached for initial trade
+
+strategy.close(id="long reversal",when=close<=short_entry*0.95) //target profit reached for reversal trade
+        
+if (strategy.position_size != 0)
+    count := count + 1
+if (strategy.position_size == 0)
+    count:=0
+    
+if (count > 120)
+    strategy.close_all() //trade timed out
+    count := 0 
+    reverse1 := 0 //reset counters since the trade has closed
+    reverse2 := 0 
+
+if close >= exit2 and reverse1 == 1 //setting flag to zero as initial buy target is hit
+    reverse1 := 0
